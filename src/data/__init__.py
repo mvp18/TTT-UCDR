@@ -1,1 +1,1 @@
-_BASE_PATH = '/home/soumava/UCDR/src/data'
+# _BASE_PATH = '/home/soumava/UCDR/src/data'

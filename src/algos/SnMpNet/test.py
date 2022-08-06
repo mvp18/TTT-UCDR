@@ -14,7 +14,7 @@ import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 
-sys.path.append('/home/soumava/UCDR/src/')
+sys.path.append('/home/spaul/windows/TTT-UCDR/src/')
 from options.options_snmpnet import Options
 from data.Sketchy import sketchy_extended
 from data.TUBerlin import tuberlin_extended
@@ -76,21 +76,27 @@ def main(args):
 	# Model
 	model = SnMpNet(semantic_dim=args.semantic_emb_size, pretrained=None, num_tr_classes=len(tr_classes)).cuda()
 
-	if args.dataset=='DomainNet':
-		save_folder_name = 'seen-'+args.seen_domain+'_unseen-'+args.holdout_domain+'_x_'+args.gallery_domain
-		if not args.include_auxillary_domains:
-			save_folder_name += '_noaux'
-	if args.dataset=='Sketchy':
-		if args.is_eccv_split:
-			save_folder_name = 'eccv_split'
-		else:
-			save_folder_name = 'random_split'
-	else:
-		save_folder_name = ''
+	# if args.dataset=='DomainNet':
+	# 	save_folder_name = 'seen-'+args.seen_domain+'_unseen-'+args.holdout_domain+'_x_'+args.gallery_domain
+	# 	if not args.include_auxillary_domains:
+	# 		save_folder_name += '_noaux'
+	# if args.dataset=='Sketchy':
+	# 	if args.is_eccv_split:
+	# 		save_folder_name = 'eccv_split'
+	# 	else:
+	# 		save_folder_name = 'random_split'
+	# else:
+	# 	save_folder_name = ''
+
+	save_folder_name = 'seen-'+args.seen_domain+'_unseen-'+args.holdout_domain+'_x_'+args.gallery_domain
+	if not args.include_auxillary_domains:
+		save_folder_name += '_noaux'
 
 	path_cp = os.path.join(args.checkpoint_path, args.dataset, save_folder_name)
 
-	best_model_name = 'val_map200-0.7603_prec200-0.7333_ep-1_mixlevel-img_wcce-1.0_wratio-0.5_wmse-1.0_clswts-2.0_e-100_es-15_opt-sgd_bs-64_lr-0.001_l2-0.0_beta-1_seed-0_tv-0.pth'
+	# best_model_name = 'val_map200-0.7603_prec200-0.7333_ep-1_mixlevel-img_wcce-1.0_wratio-0.5_wmse-1.0_clswts-2.0_e-100_es-15_opt-sgd_bs-64_lr-0.001_l2-0.0_beta-1_seed-0_tv-0.pth'
+	best_model_name = os.listdir(path_cp)[0]
+	print(best_model_name)
 	best_model_file = os.path.join(path_cp, best_model_name)
 
 	if os.path.isfile(best_model_file):

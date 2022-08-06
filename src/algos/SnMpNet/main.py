@@ -2,7 +2,7 @@ import sys
 import numpy as np
 import torch
 
-sys.path.append('/home/soumava/UCDR/src/')
+sys.path.append('/home/spaul/windows/TTT-UCDR/src/')
 # user defined
 from trainer import Trainer
 from options.options_snmpnet import Options

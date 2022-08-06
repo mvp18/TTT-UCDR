@@ -10,8 +10,8 @@ class Options:
         # Parse options for processing
         parser = argparse.ArgumentParser(description='SnMpNet for UCDR/ZS-SBIR')
         
-        parser.add_argument('-root', '--root_path', default='/data/soumava/datasets/', type=str)
-        parser.add_argument('-path_cp', '--checkpoint_path', default='/data/soumava/saved_models/SnMpNet/', type=str)
+        parser.add_argument('-root', '--root_path', default='/BS/UCDR/work/datasets/', type=str)
+        parser.add_argument('-path_cp', '--checkpoint_path', default='/BS/UCDR/work/pretrained_models/', type=str)
         parser.add_argument('-resume', '--resume_dict', default=None, type=str, help='checkpoint file to resume training from')
 
         parser.add_argument('-data', '--dataset', default='DomainNet', choices=['Sketchy', 'DomainNet', 'TUBerlin'])
@@ -24,6 +24,8 @@ class Options:
         parser.add_argument('-gd', '--gallery_domain', default='real', choices=['clipart', 'infograph', 'photo', 'painting', 'real'])
         parser.add_argument('-aux', '--include_auxillary_domains', choices=[0, 1], default=1, type=int, help='whether(1) or not(0) to include\
                             domains other than seen domain and gallery')
+        parser.add_argument('-tv', '--trainvalid', choices=[0, 1], default=0, type=int, help='whether to include val class samples during training.\
+                            1 if hyperparameter tuning done with val set')
 
         parser.add_argument('-opt', '--optimizer', type=str, choices=['sgd', 'adam'], default='sgd')
 
