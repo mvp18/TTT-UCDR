@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from random import random
 from PIL import Image, ImageOps
