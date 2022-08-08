@@ -8,6 +8,8 @@ import torchvision
 
 from scipy.spatial.distance import cdist
 
+_BASE_PATH = '/home/spaul/windows/TTT-UCDR/src/data'
+
 
 class BaselineDataset(data.Dataset):
     def __init__(self, fls, transforms=None):

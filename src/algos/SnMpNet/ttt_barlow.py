@@ -167,7 +167,7 @@ def main(args):
 		save_folder_name = ''
 
 	path_cp = os.path.join(args.checkpoint_path, args.dataset, save_folder_name)
-	path_log = os.path.join('./results', args.dataset, save_folder_name)
+	path_log = os.path.join(args.result_bt, args.dataset, save_folder_name)
 	if not os.path.isdir(path_log):
 		os.makedirs(path_log)
 
@@ -202,7 +202,8 @@ def main(args):
 		path_cp_ttt = os.path.join(args.checkpoint_bt, args.dataset, save_folder_name)
 
 		model_ttt = barlow_ttt(ttt_loader, model, args)
-		model_save_name = best_model_name[:-len('.pth')] + '_bt-lr-'+str(args.lr_clf)+'_bs-'+str(args.batch_size)
+		model_save_name = best_model_name[:-len('.pth')] + '_bt-lr-'+str(args.lr_clf)+'_bs-'+str(args.batch_size)+\
+						  '_e-'+str(args.epochs)
 
 		utils.save_checkpoint({
 							'epoch':args.epochs+1, 
