@@ -2,7 +2,7 @@ import os
 import numpy as np
 import glob
 
-_BASE_PATH = '/home/spaul/windows/TTT-UCDR/src/data'
+_BASE_PATH = '/home/absamant/windows/TTT-UCDR/src/data'
 
 
 def create_trvalte_splits(args):

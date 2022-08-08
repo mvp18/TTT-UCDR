@@ -62,6 +62,9 @@ class Options:
         # Barlow Twins parameters
         parser.add_argument('-path_bt', '--checkpoint_bt', default='/BS/UCDR/work/BT_models/', type=str)
 
+        # RotNet parameters
+        parser.add_argument('-path_rn', '--checkpoint_rn', default='/BS/UCDR/work/RN_models/', type=str)
+
         parser.add_argument('--projector', default='300-300', type=str, metavar='MLP', help='projector MLP')
         parser.add_argument('-lambd', '--lambd', type=float, default=0.0051, help='redundancy reduction loss weight')
         parser.add_argument('-lrb', '--lr_net', type=float, default=1e-5, metavar='LR', help='LR for backbone')
