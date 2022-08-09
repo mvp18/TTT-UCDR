@@ -20,26 +20,33 @@ from pdb import set_trace as breakpoint
 
 
 def rotate_img(img, rot):
-    t_ = transforms.ToTensor()
+    #t_ = transforms.functional.rotate()
 
     if rot == 0: # 0 degrees rotation
-        print('0 working')
-        return t_(img)
+        r_img = img
+        #print('0 working')
+        return img
         #return torch.from_numpy(img.copy()) #img
     elif rot == 90: # 90 degrees rotation
-        r_img = np.flipud(np.transpose(img, (1,0,2)))
-        print('90 working')
-        return t_(r_img)
+        #img = torch.tensor(img)
+        r_img = transforms.functional.rotate(img, 90)
+        #img = img.permute(1,0,2)
+        #r_img = img.flip
+        #r_img = torch.flipud(torch.transpose(img, (1,0,2)))
+        #print('90 working')
+        return r_img
         #return torch.from_numpy(r_img.copy())
     elif rot == 180: # 90 degrees rotation
-        r_img = np.fliplr(np.flipud(img))
-        print('180 working')
-        return t_(r_img)
+        #r_img = np.fliplr(np.flipud(img))
+        r_img = transforms.functional.rotate(img, 180)
+        #print('180 working')
+        return r_img
         #return torch.from_numpy(r_img.copy())
     elif rot == 270: # 270 degrees rotation / or -90
-        r_img = np.transpose(np.flipud(img), (1,0,2))
-        print('270 working')
-        return t_(r_img)
+        #r_img = np.transpose(np.flipud(img), (1,0,2))
+        r_img = transforms.functional.rotate(img, 270)
+        #print('270 working')
+        return r_img
         #return torch.from_numpy(r_img.copy())
     else:
         raise ValueError('rotation should be 0, 90, 180, or 270 degrees')

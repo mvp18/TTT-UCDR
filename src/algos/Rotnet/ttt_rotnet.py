@@ -35,7 +35,7 @@ RG = np.random.default_rng()
 def rotnet_ttt(loader, model, args):
 	 
 	device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-	sizes = [args.semantic_emb_size] + [64, 4]
+	sizes = [args.semantic_emb_size] + [4]
 
 	layers = []
 	for i in range(len(sizes) - 2):
@@ -52,6 +52,7 @@ def rotnet_ttt(loader, model, args):
                 momentum=0.9,
                 nesterov=True,
                 weight_decay=5e-4)
+	loss_obj = torch.nn.CrossEntropyLoss()
 
 	model.train()
 	rn_loss = AverageMeter() 
@@ -77,18 +78,19 @@ def rotnet_ttt(loader, model, args):
 			_, im_feat = model(dataX)
 
 			pred_var = projector(model.base_model.last_linear(im_feat))
-			loss_total = torch.nn.CrossEntropyLoss(pred_var, labels)
+			loss_total = loss_obj(pred_var, labels)
 
 			loss_total.backward()
 
 			opt_net.step()
 
-			rn_loss.update(loss_total.item(), bnumber)
+			rn_loss.update(loss_total.item(), dataX.size(0))
 
+			#print(epoch+1, idx+1)
 			if (idx+1) % args.log_interval == 0:
 				print('[Train] Epoch: [{0}][{1}/{2}]\t'
-					  'BT loss: {bt.val:.4f} ({bt.avg:.4f})\t'
-					  .format(epoch+1, i+1, len(loader), bt=loss_total))
+					  'Rotnet loss: {rn.val:.4f} ({rn.avg:.4f})\t'
+					  .format(epoch+1, idx+1, bnumber, rn=rn_loss))
 
 		end = time.time()
 		elapsed = end-start
@@ -136,10 +138,8 @@ def main(args):
 	image_transforms = {
 		'train':
 		transforms.Compose([
-			transforms.RandomResizedCrop((args.image_size, args.image_size), (0.8, 1.0)),
-			transforms.RandomHorizontalFlip(0.5),
-			transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.4),
-			lambda x: np.asarray(x),
+			transforms.Resize((args.image_size, args.image_size)),
+			#lambda x: np.asarray(x),
 			#transforms.ToTensor(),
 			#transforms.Normalize(im_mean, im_std)
 		]),
@@ -147,9 +147,9 @@ def main(args):
 		'eval':
 		transforms.Compose([
 			transforms.Resize((args.image_size, args.image_size)),
-			lambda x: np.asarray(x),
-			#transforms.ToTensor(),
-			#transforms.Normalize(im_mean, im_std)
+			#lambda x: np.asarray(x),
+			transforms.ToTensor(),
+			transforms.Normalize(im_mean, im_std)
 		]),
 	}
 
@@ -183,9 +183,9 @@ def main(args):
 	splits_gallery = domainnet.trvalte_per_domain(args, args.gallery_domain, 0, tr_classes, va_classes, te_classes)
 	data_splits_ttt += splits_gallery['te']
 
-	print('Number of training samples for BT:{}.'.format(len(data_splits_ttt)))
+	print('Number of training samples for Rotnet:{}.'.format(len(data_splits_ttt)))
 
-	data_ttt = BaselineDataset(np.array(data_splits_ttt), transforms=image_transforms['eval'])
+	data_ttt = BaselineDataset(np.array(data_splits_ttt), transforms=image_transforms['train'])
 	ttt_loader = RotnetLoader(dataset=data_ttt, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
 
 	##########
@@ -267,7 +267,7 @@ def main(args):
 		model.load_state_dict(checkpoint['model_state_dict'])
 		print("Loaded best model '{0}' (epoch {1}; mAP {2:.4f})\n".format(best_model_file, epoch, best_map))
 
-		path_cp_ttt = os.path.join(args.checkpoint_bt, args.dataset, save_folder_name)
+		path_cp_ttt = os.path.join(args.checkpoint_rn, args.dataset, save_folder_name)
 
 		model_ttt = rotnet_ttt(ttt_loader, model, args)
 		model_save_name = best_model_name[:-len('.pth')] + '_bt-lr-'+str(args.lr_clf)+'_bs-'+str(args.batch_size)
@@ -276,6 +276,44 @@ def main(args):
 							'epoch':args.epochs+1, 
 							'model_state_dict':model_ttt.state_dict(),
 							}, directory=path_cp_ttt, save_name=model_save_name, last_chkpt='')
+
+	else:
+		print(f'{best_model_file} not found!')
+		exit(0)
+
+	outstr = ''
+
+	if args.dataset=='DomainNet':
+		
+		for domain in [args.seen_domain, args.holdout_domain]:
+			for gzs in [0, 1]:
+
+				test_head_str = 'Query:' + domain + '; Gallery:' + args.gallery_domain + '; Generalized:' + str(gzs)
+				print(test_head_str)
+				outstr += test_head_str
+
+				splits_query = domainnet.trvalte_per_domain(args, domain, 0, tr_classes, va_classes, te_classes)
+				splits_gallery = domainnet.trvalte_per_domain(args, args.gallery_domain, gzs, tr_classes, va_classes, te_classes)
+				
+				data_te_query = BaselineDataset(np.array(splits_query['te']), transforms=image_transforms['eval'])
+				data_te_gallery = BaselineDataset(np.array(splits_gallery['te']), transforms=image_transforms['eval'])
+
+				# PyTorch test loader for query
+				te_loader_query = DataLoader(dataset=data_te_query, batch_size=64*5, shuffle=False, 
+												num_workers=args.num_workers, pin_memory=True)
+				# PyTorch test loader for gallery
+				te_loader_gallery = DataLoader(dataset=data_te_gallery, batch_size=64*5, shuffle=False, 
+												num_workers=args.num_workers, pin_memory=True)
+
+				print(f'#Test queries:{len(te_loader_query.dataset)}; #Test gallery samples:{len(te_loader_gallery.dataset)}.\n')
+				te_data = evaluate(te_loader_query, te_loader_gallery, model_ttt, None, epoch, args)
+			
+				test_str="\n\nmAP@200 = %.4f, Prec@200 = %.4f, mAP@all = %.4f, Prec@100 = %.4f"%(np.mean(te_data['aps@200']), te_data['prec@200'], 
+						np.mean(te_data['aps@all']), te_data['prec@100'])
+				
+				print(test_str)
+				outstr += test_str
+				outstr += '\n\n'
 
 	else:
 		data_splits = data_input['splits']
