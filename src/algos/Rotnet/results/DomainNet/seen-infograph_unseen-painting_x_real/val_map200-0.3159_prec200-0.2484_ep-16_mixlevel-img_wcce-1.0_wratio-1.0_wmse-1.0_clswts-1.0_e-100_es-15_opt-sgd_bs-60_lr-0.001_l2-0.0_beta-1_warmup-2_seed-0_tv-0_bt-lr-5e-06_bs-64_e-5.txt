@@ -1,0 +1,16 @@
+Query:infograph; Gallery:real; Generalized:0
+
+mAP@200 = 0.2333, Prec@200 = 0.1913, mAP@all = 0.1405, Prec@100 = 0.2080
+
+Query:infograph; Gallery:real; Generalized:1
+
+mAP@200 = 0.1987, Prec@200 = 0.1634, mAP@all = 0.1171, Prec@100 = 0.1756
+
+Query:painting; Gallery:real; Generalized:0
+
+mAP@200 = 0.3728, Prec@200 = 0.3042, mAP@all = 0.2135, Prec@100 = 0.3383
+
+Query:painting; Gallery:real; Generalized:1
+
+mAP@200 = 0.3318, Prec@200 = 0.2713, mAP@all = 0.1853, Prec@100 = 0.3003
+

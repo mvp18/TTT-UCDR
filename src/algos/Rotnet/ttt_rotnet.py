@@ -270,7 +270,7 @@ def main(args):
 		path_cp_ttt = os.path.join(args.checkpoint_rn, args.dataset, save_folder_name)
 
 		model_ttt = rotnet_ttt(ttt_loader, model, args)
-		model_save_name = best_model_name[:-len('.pth')] + '_bt-lr-'+str(args.lr_clf)+'_bs-'+str(args.batch_size)
+		model_save_name = best_model_name[:-len('.pth')] + '_bt-lr-'+str(args.lr_clf)+'_bs-'+str(args.batch_size)+'_e-'+str(args.epochs)
 
 		utils.save_checkpoint({
 							'epoch':args.epochs+1, 
