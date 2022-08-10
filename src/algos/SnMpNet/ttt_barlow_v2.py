@@ -191,7 +191,7 @@ def main(args):
 		path_cp_ttt = os.path.join(args.checkpoint_bt2, args.dataset, save_folder_name)
 
 		model_ttt = barlow_ttt(ttt_loader, model, args)
-		model_save_name = best_model_name[:-len('.pth')] + '_bt-lrc-'+str(args.lr_clf) + '_lrb-'+str(args.lr_net)' +\
+		model_save_name = best_model_name[:-len('.pth')] + '_bt-lrc-'+str(args.lr_clf) + '_lrb-'+str(args.lr_net) +\
 						  '_bs-'+str(args.batch_size) + '_e-'+str(args.epochs)
 
 		utils.save_checkpoint({
