@@ -13,7 +13,7 @@ parse_section()
     [[ "${line% =*}" == "$param" ]] && { echo "${line#*= }"; break; }
   done
 }
-path_dataset=/home/soumava/datasets/
+path_dataset=/BS/UCDR/work/datasets/
 if [[ ! -d $path_dataset ]]; then
   mkdir $path_dataset
 fi

@@ -68,9 +68,17 @@ class Options:
         parser.add_argument('-lrb', '--lr_net', type=float, default=1e-5, metavar='LR', help='LR for backbone')
         parser.add_argument('-lrc', '--lr_clf', type=float, default=1e-4, metavar='LR', help='LR for semantic projector')
 
+        # Barlow Twins v2 parameters
+        parser.add_argument('-path_bt2', '--checkpoint_bt2', default='/BS/UCDR/work/BT2_models/', type=str)
+        parser.add_argument('-result_bt2', '--result_bt2', default='/BS/UCDR/work/BT2_results/', type=str)
+
         # Jigsaw parameters
         parser.add_argument('-path_jig', '--checkpoint_jig', default='/BS/UCDR/work/Jig_models/', type=str)
         parser.add_argument('-result_jig', '--result_jig', default='/BS/UCDR/work/Jig_results/', type=str)
+
+        # Jigsaw v2 parameters
+        parser.add_argument('-path_jig2', '--checkpoint_jig2', default='/BS/UCDR/work/jig2_models/', type=str)
+        parser.add_argument('-result_jig2', '--result_jig2', default='/BS/UCDR/work/jig2_results/', type=str)
 
         self.parser = parser
 

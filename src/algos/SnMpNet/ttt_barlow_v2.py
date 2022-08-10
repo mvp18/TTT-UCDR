@@ -29,24 +29,14 @@ from utils import utils
 
 def barlow_ttt(loader, model, args):
 
-	# projector
-	sizes = [args.semantic_emb_size] + list(map(int, args.projector.split('-')))
-	layers = []
-	for i in range(len(sizes) - 2):
-		layers.append(nn.Linear(sizes[i], sizes[i + 1], bias=False))
-		layers.append(nn.BatchNorm1d(sizes[i + 1]))
-		layers.append(nn.ReLU(inplace=True))
-	layers.append(nn.Linear(sizes[-2], sizes[-1], bias=False))
-	projector = nn.Sequential(*layers).cuda()
-
 	# normalization layer for the representations z1 and z2
 	bn_layer = nn.BatchNorm1d(args.semantic_emb_size, affine=False).cuda()
 	
+	backbone_params = list(model.base_model.parameters())[:-2]
 	classifier_params = model.base_model.last_linear.parameters()
 
-	# opt_net = optim.SGD(model.base_model.last_linear.parameters(), weight_decay=0, lr=args.lr_net)
+	opt_net = optim.SGD(backbone_params, weight_decay=0, lr=args.lr_net)
 	opt_clf = optim.SGD(list(classifier_params) + list(bn_layer.parameters()), weight_decay=0, lr=args.lr_clf)
-	# opt_clf = optim.SGD(list(classifier_params) + list(projector.parameters()) + list(bn_layer.parameters()), weight_decay=0, lr=1e-4)
 
 	model.train()
 
@@ -62,7 +52,7 @@ def barlow_ttt(loader, model, args):
 			im1 = im1.float().cuda()
 			im2 = im2.float().cuda()
 
-			# opt_net.zero_grad()
+			opt_net.zero_grad()
 			opt_clf.zero_grad()
 
 			_, im_feat1 = model(im1)
@@ -84,7 +74,7 @@ def barlow_ttt(loader, model, args):
 			loss = on_diag + args.lambd*off_diag
 			loss.backward()
 
-			# opt_net.step()
+			opt_net.step()
 			opt_clf.step()
 
 			bt_loss.update(loss.item(), im1.size(0))
@@ -167,7 +157,7 @@ def main(args):
 		save_folder_name = ''
 
 	path_cp = os.path.join(args.checkpoint_path, args.dataset, save_folder_name)
-	path_log = os.path.join(args.result_bt, args.dataset, save_folder_name)
+	path_log = os.path.join(args.result_bt2, args.dataset, save_folder_name)
 	if not os.path.isdir(path_log):
 		os.makedirs(path_log)
 
@@ -198,11 +188,11 @@ def main(args):
 		model.load_state_dict(checkpoint['model_state_dict'])
 		print("Loaded best model '{0}' (epoch {1}; mAP {2:.4f})\n".format(best_model_file, epoch, best_map))
 
-		path_cp_ttt = os.path.join(args.checkpoint_bt, args.dataset, save_folder_name)
+		path_cp_ttt = os.path.join(args.checkpoint_bt2, args.dataset, save_folder_name)
 
 		model_ttt = barlow_ttt(ttt_loader, model, args)
-		model_save_name = best_model_name[:-len('.pth')] + '_bt-lr-'+str(args.lr_clf)+'_bs-'+str(args.batch_size)+\
-						  '_e-'+str(args.epochs)
+		model_save_name = best_model_name[:-len('.pth')] + '_bt-lrc-'+str(args.lr_clf) + '_lrb-'+str(args.lr_net)' +\
+						  '_bs-'+str(args.batch_size) + '_e-'+str(args.epochs)
 
 		utils.save_checkpoint({
 							'epoch':args.epochs+1, 

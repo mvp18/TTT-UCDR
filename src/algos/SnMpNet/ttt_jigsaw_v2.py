@@ -19,80 +19,53 @@ from options.options_snmpnet import Options
 from data.Sketchy import sketchy_extended
 from data.TUBerlin import tuberlin_extended
 from data.DomainNet import domainnet
-from data.dataloaders import BaselineDataset
-from algos.BarlowTwins import barlowtwins
+from data.dataloaders import JigsawDataset, BaselineDataset
 from models.snmpnet.snmpnet import SnMpNet
 from trainer import evaluate
 from utils.logger import AverageMeter
 from utils import utils
 
 
-def barlow_ttt(loader, model, args):
+def jigsaw_ttt(loader, model, jig_classes, args):
 
-	# projector
-	sizes = [args.semantic_emb_size] + list(map(int, args.projector.split('-')))
-	layers = []
-	for i in range(len(sizes) - 2):
-		layers.append(nn.Linear(sizes[i], sizes[i + 1], bias=False))
-		layers.append(nn.BatchNorm1d(sizes[i + 1]))
-		layers.append(nn.ReLU(inplace=True))
-	layers.append(nn.Linear(sizes[-2], sizes[-1], bias=False))
-	projector = nn.Sequential(*layers).cuda()
+	jig_classifier = nn.Linear(2048, jig_classes).cuda()
 
-	# normalization layer for the representations z1 and z2
-	bn_layer = nn.BatchNorm1d(args.semantic_emb_size, affine=False).cuda()
-	
-	classifier_params = model.base_model.last_linear.parameters()
+	jigen_loss = nn.CrossEntropyLoss()
 
-	# opt_net = optim.SGD(model.base_model.last_linear.parameters(), weight_decay=0, lr=args.lr_net)
-	opt_clf = optim.SGD(list(classifier_params) + list(bn_layer.parameters()), weight_decay=0, lr=args.lr_clf)
-	# opt_clf = optim.SGD(list(classifier_params) + list(projector.parameters()) + list(bn_layer.parameters()), weight_decay=0, lr=1e-4)
+	opt_net = optim.SGD(list(model.parameters()) + list(jig_classifier.parameters()), weight_decay=0, lr=args.lr_net)
 
 	model.train()
 
-	bt_loss = AverageMeter()
+	jig_loss = AverageMeter()
 
 	for epoch in range(args.epochs):
 
 		# Start counting time
 		start = time.time()
 
-		for i, (im1, im2, _) in enumerate(loader):
+		for i, (data, order, cl) in enumerate(loader):
 			
-			im1 = im1.float().cuda()
-			im2 = im2.float().cuda()
+			data = data.float().cuda()
+			data1, data2 = torch.split(data, [3, 3], dim=1)
 
-			# opt_net.zero_grad()
-			opt_clf.zero_grad()
+			order = order.long().cuda()
 
-			_, im_feat1 = model(im1)
-			_, im_feat2 = model(im2)
+			opt_net.zero_grad()
 
-			z1 = model.base_model.last_linear(im_feat1)
-			z2 = model.base_model.last_linear(im_feat2)
+			_, im_feat = model(data2)
+			jig = jig_classifier(im_feat)
 
-			# z1 = projector(z1)
-			# z2 = projector(z2)
-
-			# empirical cross-correlation matrix
-			# c = torch.t(z1) @ z2
-			c = torch.t(bn_layer(z1)) @ bn_layer(z2)
-			c.div_(args.batch_size)
-
-			on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()
-			off_diag = barlowtwins.off_diagonal(c).pow_(2).sum()
-			loss = on_diag + args.lambd*off_diag
+			loss = jigen_loss(jig, order)
 			loss.backward()
 
-			# opt_net.step()
-			opt_clf.step()
+			opt_net.step()
 
-			bt_loss.update(loss.item(), im1.size(0))
+			jig_loss.update(loss.item(), data2.size(0))
 
 			if (i+1) % args.log_interval == 0:
 				print('[Train] Epoch: [{0}][{1}/{2}]\t'
-					  'BT loss: {bt.val:.4f} ({bt.avg:.4f})\t'
-					  .format(epoch+1, i+1, len(loader), bt=bt_loss))
+					  'Jig loss: {jig.val:.4f} ({jig.avg:.4f})\t'
+					  .format(epoch+1, i+1, len(loader), jig=jig_loss))
 
 		end = time.time()
 		elapsed = end-start
@@ -133,14 +106,20 @@ def main(args):
 
 	# Image transformations
 	image_transforms = {
-		'train':
+		'train':{
+		'image':
 		transforms.Compose([
-			transforms.RandomResizedCrop((args.image_size, args.image_size), (0.8, 1.0)),
-			transforms.RandomHorizontalFlip(0.5),
-			transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.4),
+			transforms.RandomResizedCrop((222, 222), (0.8, 1.0)),
+			# transforms.RandomHorizontalFlip(0.5),
+			transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.4)
+		]),		
+		'tile':
+			transforms.Compose([
+			transforms.RandomGrayscale(0.1),
 			transforms.ToTensor(),
 			transforms.Normalize(im_mean, im_std)
-		]),
+		])
+		},
 
 		'eval':
 		transforms.Compose([
@@ -167,11 +146,10 @@ def main(args):
 		save_folder_name = ''
 
 	path_cp = os.path.join(args.checkpoint_path, args.dataset, save_folder_name)
-	path_log = os.path.join(args.result_bt, args.dataset, save_folder_name)
+	path_log = os.path.join(args.result_jig2, args.dataset, save_folder_name)
 	if not os.path.isdir(path_log):
 		os.makedirs(path_log)
 
-	transform_bt, transform_bt_prime = barlowtwins.Transform_BT()
 	data_splits_ttt = []
 	for domain in [args.seen_domain, args.holdout_domain]:
 		splits_query = domainnet.trvalte_per_domain(args, domain, 0, tr_classes, va_classes, te_classes)
@@ -180,9 +158,9 @@ def main(args):
 	splits_gallery = domainnet.trvalte_per_domain(args, args.gallery_domain, 0, tr_classes, va_classes, te_classes)
 	data_splits_ttt += splits_gallery['te']
 
-	print('Number of training samples for BT:{}.'.format(len(data_splits_ttt)))
+	print('Number of training samples for Jig:{}.'.format(len(data_splits_ttt)))
 
-	data_ttt = barlowtwins.BarlowDataset(data_splits_ttt, transform_bt, transform_bt_prime)
+	data_ttt = JigsawDataset(data_splits_ttt, transforms=image_transforms['train'])
 	ttt_loader = DataLoader(data_ttt, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
 
 	best_model_name = os.listdir(path_cp)[0]
@@ -198,10 +176,10 @@ def main(args):
 		model.load_state_dict(checkpoint['model_state_dict'])
 		print("Loaded best model '{0}' (epoch {1}; mAP {2:.4f})\n".format(best_model_file, epoch, best_map))
 
-		path_cp_ttt = os.path.join(args.checkpoint_bt, args.dataset, save_folder_name)
+		path_cp_ttt = os.path.join(args.checkpoint_jig2, args.dataset, save_folder_name)
 
-		model_ttt = barlow_ttt(ttt_loader, model, args)
-		model_save_name = best_model_name[:-len('.pth')] + '_bt-lr-'+str(args.lr_clf)+'_bs-'+str(args.batch_size)+\
+		model_ttt = jigsaw_ttt(ttt_loader, model, 31, args)
+		model_save_name = best_model_name[:-len('.pth')] + '_jig-lr-'+str(args.lr_clf)+'_bs-'+str(args.batch_size)+\
 						  '_e-'+str(args.epochs)
 
 		utils.save_checkpoint({
@@ -241,7 +219,7 @@ def main(args):
 				te_data = evaluate(te_loader_query, te_loader_gallery, model_ttt, None, epoch, args)
 			
 				test_str="\n\nmAP@200 = %.4f, Prec@200 = %.4f, mAP@all = %.4f, Prec@100 = %.4f"%(np.mean(te_data['aps@200']), te_data['prec@200'], 
-						np.mean(te_data['aps@all']), te_data['prec@100'])
+						  np.mean(te_data['aps@all']), te_data['prec@100'])
 				
 				print(test_str)
 				outstr += test_str

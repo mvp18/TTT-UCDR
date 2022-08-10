@@ -114,7 +114,7 @@ def main(args):
 		'train':{
 		'image':
 		transforms.Compose([
-			transforms.RandomResizedCrop((args.image_size, args.image_size), (0.8, 1.0)),
+			transforms.RandomResizedCrop((222, 222), (0.8, 1.0)),
 			# transforms.RandomHorizontalFlip(0.5),
 			transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.4)
 		]),		
