@@ -1,11 +1,14 @@
 import os
 import numpy as np
 import glob
+import pickle
+
+_BASE_PATH = '/home/spaul/windows/TTT-UCDR/src/data'
 
 
 def create_trvalte_splits(args):
 
-    path_sk = os.path.join(args.root_path, 'Sketchy', 'sketch')
+    path_sk = os.path.join(args.root_path, 'Sketchy', 'sketch/tx_000000000000')
     path_im = os.path.join(args.root_path, 'Sketchy', 'extended_photo')
 
     tr_classes, va_classes, te_classes, cid_mask, splits_sk = trvalte_per_domain(args, path_sk, is_eccv_split=bool(args.is_eccv_split))
@@ -40,14 +43,14 @@ def trvalte_per_domain(args, datapath, is_eccv_split=True):
     classes = sorted(os.listdir(datapath))
 
     if is_eccv_split:
-        with open(os.path.join(_BASE_PATH, 'Sketchy/test_classes_eccv_2018.txt', 'r')) as fp:
+        with open(os.path.join(_BASE_PATH, 'Sketchy/test_classes_eccv_2018.txt'), 'r') as fp:
         # with open('test_classes_eccv_2018.txt', 'r') as fp:
             te_classes = fp.read().splitlines()
 
         with open(os.path.join(_BASE_PATH, 'Sketchy/cid_mask_eccv_split.pkl'), 'rb') as f:
             cid_mask = pickle.load(f)
     else:
-        with open(os.path.join(_BASE_PATH, 'Sketchy/test_classes_random_split.txt', 'r')) as fp:
+        with open(os.path.join(_BASE_PATH, 'Sketchy/test_classes_random_split.txt'), 'r') as fp:
             te_classes = fp.read().splitlines()
 
         with open(os.path.join(_BASE_PATH, 'Sketchy/cid_mask_random_split.pkl'), 'rb') as f:

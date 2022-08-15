@@ -76,27 +76,24 @@ def main(args):
 	# Model
 	model = SnMpNet(semantic_dim=args.semantic_emb_size, pretrained=None, num_tr_classes=len(tr_classes)).cuda()
 
-	# if args.dataset=='DomainNet':
-	# 	save_folder_name = 'seen-'+args.seen_domain+'_unseen-'+args.holdout_domain+'_x_'+args.gallery_domain
-	# 	if not args.include_auxillary_domains:
-	# 		save_folder_name += '_noaux'
-	# if args.dataset=='Sketchy':
-	# 	if args.is_eccv_split:
-	# 		save_folder_name = 'eccv_split'
-	# 	else:
-	# 		save_folder_name = 'random_split'
-	# else:
-	# 	save_folder_name = ''
-
 	save_folder_name = 'seen-'+args.seen_domain+'_unseen-'+args.holdout_domain+'_x_'+args.gallery_domain
 	if not args.include_auxillary_domains:
 		save_folder_name += '_noaux'
 
-	path_cp = os.path.join(args.checkpoint_path, args.dataset, save_folder_name)
+	if args.dataset=='Sketchy':
+		if args.is_eccv_split:
+			save_folder_name = 'eccv_split'
+		else:
+			save_folder_name = 'random_split'
 
-	# best_model_name = 'val_map200-0.7603_prec200-0.7333_ep-1_mixlevel-img_wcce-1.0_wratio-0.5_wmse-1.0_clswts-2.0_e-100_es-15_opt-sgd_bs-64_lr-0.001_l2-0.0_beta-1_seed-0_tv-0.pth'
+	path_cp = os.path.join(args.checkpoint_path, args.dataset, save_folder_name)
+	path_log = os.path.join(args.result_original, args.dataset, save_folder_name)
+	if not os.path.isdir(path_log):
+		os.makedirs(path_log)
+
 	best_model_name = os.listdir(path_cp)[0]
-	print(best_model_name)
+	if args.dataset=='Sketchy':
+		best_model_name = 'val_map200-0.7603_prec200-0.7333_ep-1_mixlevel-img_wcce-1.0_wratio-0.5_wmse-1.0_clswts-2.0_e-100_es-15_opt-sgd_bs-64_lr-0.001_l2-0.0_beta-1_seed-0_tv-0.pth'
 	best_model_file = os.path.join(path_cp, best_model_name)
 
 	if os.path.isfile(best_model_file):
@@ -135,10 +132,11 @@ def main(args):
 
 					print(f'#Test queries:{len(te_loader_query.dataset)}; #Test gallery samples:{len(te_loader_gallery.dataset)}.\n')
 					te_data = evaluate(te_loader_query, te_loader_gallery, model, None, epoch, args)
-				
-					outstr+="\n\nmAP@200 = %.4f, Prec@200 = %.4f, mAP@all = %.4f, Prec@100 = %.4f"%(np.mean(te_data['aps@200']), te_data['prec@200'], 
-							np.mean(te_data['aps@all']), te_data['prec@100'])
 
+					test_str = "\n\nmAP@200 = %.4f, Prec@200 = %.4f, mAP@all = %.4f, Prec@100 = %.4f"%(np.mean(te_data['aps@200']), te_data['prec@200'], 
+								np.mean(te_data['aps@all']), te_data['prec@100'])
+					print(test_str)
+					outstr += test_str
 					outstr += '\n\n'
 		else:
 			data_splits = data_input['splits']
@@ -156,6 +154,9 @@ def main(args):
 					np.mean(te_data['aps@all']), te_data['prec@100'])
 		
 		print(outstr)
+		result_file = open(os.path.join(path_log, best_model_name[:-len('.pth')]+'.txt'), 'w')
+		result_file.write(outstr)
+		result_file.close()
 		
 	else:
 		print(f'{best_model_file} not found!')

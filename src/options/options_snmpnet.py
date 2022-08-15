@@ -59,6 +59,10 @@ class Options:
         # I/O parameters
         parser.add_argument('-log', '--log_interval', type=int, default=400, metavar='N', help='How many batches to wait before logging training status')
 
+        # Result folders for original models
+        parser.add_argument('-result_org', '--result_original', default='/BS/UCDR/work/original_results/', type=str)
+        parser.add_argument('-result_cross', '--result_cross', default='/BS/UCDR/work/cross_results/', type=str)
+
         # Barlow Twins parameters
         parser.add_argument('-path_bt', '--checkpoint_bt', default='/BS/UCDR/work/BT_models/', type=str)
         parser.add_argument('-result_bt', '--result_bt', default='/BS/UCDR/work/BT_results/', type=str)
