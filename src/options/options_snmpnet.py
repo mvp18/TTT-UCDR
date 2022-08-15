@@ -11,7 +11,7 @@ class Options:
         parser = argparse.ArgumentParser(description='SnMpNet for UCDR/ZS-SBIR')
         
         parser.add_argument('-root', '--root_path', default='/BS/UCDR/work/datasets/', type=str)
-        parser.add_argument('-path_cp', '--checkpoint_path', default='/BS/UCDR/work/pretrained_models/', type=str)
+        parser.add_argument('-path_cp', '--checkpoint_path', default='/BS/UCDR/work/snmpnet_rn_models/', type=str)
         parser.add_argument('-resume', '--resume_dict', default=None, type=str, help='checkpoint file to resume training from')
 
         parser.add_argument('-data', '--dataset', default='DomainNet', choices=['Sketchy', 'DomainNet', 'TUBerlin'])
@@ -33,6 +33,7 @@ class Options:
         parser.add_argument('-wcce', '--wcce', default=1.0, type=float, help='Weight on Distance based CCE Loss')
         parser.add_argument('-wmse', '--wmse', default=0.0, type=float, help='Weight on MSE Loss')
         parser.add_argument('-wrat', '--wratio', default=0.0, type=float, help='Weight on Soft Crossentropy Loss for mixup ratio prediction')
+        parser.add_argument('-wrot', '--wrot', default=0.0, type=float, help='Weight on Crossentropy Loss for rotation prediction')
         parser.add_argument('-alpha', '--alpha', default=0, type=float, help='Parameter to scale weights for Class Similarity Matrix')
         parser.add_argument('-l2', '--l2_reg', default=0.0, type=float, help='L2 Weight Decay for optimizer')
 
@@ -41,6 +42,7 @@ class Options:
         parser.add_argument('-imsz', '--image_size', default=224, type=int, help='Input size for query/gallery domain sample')
         
         # Model parameters
+        parser.add_argument('-use_rotated', type=bool, default=True, help='use rotated images for all losses')
         parser.add_argument('-mixl', '--mixup_level', type=str, choices=['feat', 'img'], default='img', help='mixup at the image or feature level')
         parser.add_argument('-beta', '--mixup_beta', type=float, default=1, help='mixup interpolation coefficient')
         parser.add_argument('-step', '--mixup_step', type=int, default=2, help='Initial warmup steps for domain and class mixing ratios.')
@@ -57,12 +59,12 @@ class Options:
         parser.add_argument('-es', '--early_stop', type=int, default=30, help='Early stopping epochs.')
 
         # I/O parameters
-        parser.add_argument('-log', '--log_interval', type=int, default=400, metavar='N', help='How many batches to wait before logging training status')
+        parser.add_argument('-log', '--log_interval', type=int, default=4, metavar='N', help='How many batches to wait before logging training status')
 
         # Barlow Twins parameters
         parser.add_argument('-path_bt', '--checkpoint_bt', default='/BS/UCDR/work/BT_models/', type=str)
 
-        # RotNet parameters
+        # RotNet TTT parameters
         parser.add_argument('-path_rn', '--checkpoint_rn', default='/BS/UCDR/work/RN_models/', type=str)
 
         parser.add_argument('--projector', default='300-300', type=str, metavar='MLP', help='projector MLP')
