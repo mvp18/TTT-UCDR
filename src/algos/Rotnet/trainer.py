@@ -416,7 +416,7 @@ class Trainer:
 			# evaluate on validation set, map_ since map is already there
 			print('\n***Validation***')
 			valid_data = evaluate(self.va_loader_query, self.va_loader_gallery, self.model, self.glove_embed_seen, 
-								  self.current_epoch+1, self.args, 'val')
+								  self.current_epoch+1, self.args)
 			
 			map_ = np.mean(valid_data[self.map_metric])
 			prec = valid_data[self.prec_metric]
