@@ -59,30 +59,24 @@ class Options:
         # I/O parameters
         parser.add_argument('-log', '--log_interval', type=int, default=400, metavar='N', help='How many batches to wait before logging training status')
 
+        parser.add_argument('-lrb', '--lr_net', type=float, default=1e-6, metavar='LR', help='LR for backbone')
+        parser.add_argument('-lrc', '--lr_clf', type=float, default=1e-5, metavar='LR', help='LR for semantic projector')
+
         # Result folders for original models
         parser.add_argument('-result_org', '--result_original', default='/BS/UCDR/work/original_results/', type=str)
         parser.add_argument('-result_cross', '--result_cross', default='/BS/UCDR/work/cross_results/', type=str)
 
-        # Barlow Twins parameters
-        parser.add_argument('-path_bt', '--checkpoint_bt', default='/BS/UCDR/work/BT_models/', type=str)
-        parser.add_argument('-result_bt', '--result_bt', default='/BS/UCDR/work/BT_results/', type=str)
+        parser.add_argument('-save_path', '--save_path', default='/BS/UCDR/work/', type=str, help='base path for jigsaw and barlow twins')
 
+        # Barlow Twins parameters
         parser.add_argument('--projector', default='300-300', type=str, metavar='MLP', help='projector MLP')
         parser.add_argument('-lambd', '--lambd', type=float, default=0.0051, help='redundancy reduction loss weight')
-        parser.add_argument('-lrb', '--lr_net', type=float, default=1e-5, metavar='LR', help='LR for backbone')
-        parser.add_argument('-lrc', '--lr_clf', type=float, default=1e-4, metavar='LR', help='LR for semantic projector')
-
-        # Barlow Twins v2 parameters
-        parser.add_argument('-path_bt2', '--checkpoint_bt2', default='/BS/UCDR/work/BT2_models/', type=str)
-        parser.add_argument('-result_bt2', '--result_bt2', default='/BS/UCDR/work/BT2_results/', type=str)
 
         # Jigsaw parameters
-        parser.add_argument('-path_jig', '--checkpoint_jig', default='/BS/UCDR/work/Jig_models/', type=str)
-        parser.add_argument('-result_jig', '--result_jig', default='/BS/UCDR/work/Jig_results/', type=str)
+        parser.add_argument('-jig_v', '--jigsaw_version', type=int, choices=[1, 2], default=2, help='Jigsaw loss version')
 
-        # Jigsaw v2 parameters
-        parser.add_argument('-path_jig2', '--checkpoint_jig2', default='/BS/UCDR/work/jig2_models/', type=str)
-        parser.add_argument('-result_jig2', '--result_jig2', default='/BS/UCDR/work/jig2_results/', type=str)
+        # Rotnet parameters
+        parser.add_argument('-rot_v', '--rotnet_version', type=int, choices=[1, 2], default=2, help='Rotnet loss version')
 
         self.parser = parser
 

@@ -27,70 +27,6 @@ from utils.logger import AverageMeter
 from utils import utils
 
 
-def barlow_ttt(loader, model, args):
-
-	# normalization layer for the representations z1 and z2
-	bn_layer = nn.BatchNorm1d(args.semantic_emb_size, affine=False).cuda()
-	
-	backbone_params = list(model.base_model.parameters())[:-2]
-	classifier_params = model.base_model.last_linear.parameters()
-
-	opt_net = optim.SGD(backbone_params, weight_decay=0, lr=args.lr_net)
-	opt_clf = optim.SGD(list(classifier_params) + list(bn_layer.parameters()), weight_decay=0, lr=args.lr_clf)
-
-	model.train()
-
-	bt_loss = AverageMeter()
-
-	for epoch in range(args.epochs):
-
-		# Start counting time
-		start = time.time()
-
-		for i, (im1, im2, _) in enumerate(loader):
-			
-			im1 = im1.float().cuda()
-			im2 = im2.float().cuda()
-
-			opt_net.zero_grad()
-			opt_clf.zero_grad()
-
-			_, im_feat1 = model(im1)
-			_, im_feat2 = model(im2)
-
-			z1 = model.base_model.last_linear(im_feat1)
-			z2 = model.base_model.last_linear(im_feat2)
-
-			# z1 = projector(z1)
-			# z2 = projector(z2)
-
-			# empirical cross-correlation matrix
-			# c = torch.t(z1) @ z2
-			c = torch.t(bn_layer(z1)) @ bn_layer(z2)
-			c.div_(args.batch_size)
-
-			on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()
-			off_diag = barlowtwins.off_diagonal(c).pow_(2).sum()
-			loss = on_diag + args.lambd*off_diag
-			loss.backward()
-
-			opt_net.step()
-			opt_clf.step()
-
-			bt_loss.update(loss.item(), im1.size(0))
-
-			if (i+1) % args.log_interval == 0:
-				print('[Train] Epoch: [{0}][{1}/{2}]\t'
-					  'BT loss: {bt.val:.4f} ({bt.avg:.4f})\t'
-					  .format(epoch+1, i+1, len(loader), bt=bt_loss))
-
-		end = time.time()
-		elapsed = end-start
-		print(f"Time Taken:{elapsed//60:.0f}m{elapsed%60:.0f}s.\n")
-	
-	return model
-
-
 def main(args):
 
 	np.random.seed(args.seed)
@@ -142,7 +78,7 @@ def main(args):
 		save_folder_name = 'random_split'
 
 	path_cp = os.path.join(args.checkpoint_path, 'DomainNet', 'seen-quickdraw_unseen-sketch_x_real')
-	path_log = os.path.join(args.result_bt2, 'cross', 'Sketchy', save_folder_name)
+	path_log = os.path.join(args.save_path, 'BT2_results', 'cross', 'Sketchy', save_folder_name)
 	if not os.path.isdir(path_log):
 		os.makedirs(path_log)
 
@@ -168,9 +104,9 @@ def main(args):
 		model.load_state_dict(checkpoint['model_state_dict'])
 		print("Loaded best model '{0}' (epoch {1}; mAP {2:.4f})\n".format(best_model_file, epoch, best_map))
 
-		path_cp_ttt = os.path.join(args.checkpoint_bt2, 'cross', 'Sketchy', save_folder_name)
+		path_cp_ttt = os.path.join(args.save_path, 'BT2_models', 'cross', 'Sketchy', save_folder_name)
 
-		model_ttt = barlow_ttt(ttt_loader, model, args)
+		model_ttt = barlowtwins.barlow_ttt(ttt_loader, model, args)
 		model_save_name = best_model_name[:-len('.pth')] + '_bt-lrc-'+str(args.lr_clf) + '_lrb-'+str(args.lr_net) +\
 						  '_bs-'+str(args.batch_size) + '_e-'+str(args.epochs)
 

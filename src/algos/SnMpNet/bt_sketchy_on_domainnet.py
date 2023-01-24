@@ -19,60 +19,12 @@ from options.options_snmpnet import Options
 from data.Sketchy import sketchy_extended
 from data.TUBerlin import tuberlin_extended
 from data.DomainNet import domainnet
-from data.dataloaders import JigsawDataset, BaselineDataset
+from data.dataloaders import BaselineDataset
 from algos.BarlowTwins import barlowtwins
 from models.snmpnet.snmpnet import SnMpNet
 from trainer import evaluate
 from utils.logger import AverageMeter
 from utils import utils
-
-
-def jigsaw_ttt(loader, model, jig_classes, args):
-
-	jig_classifier = nn.Linear(2048, jig_classes).cuda()
-
-	jigen_loss = nn.CrossEntropyLoss()
-
-	opt_net = optim.SGD(list(model.parameters()) + list(jig_classifier.parameters()), weight_decay=0, lr=args.lr_net)
-
-	model.train()
-
-	jig_loss = AverageMeter()
-
-	for epoch in range(args.epochs):
-
-		# Start counting time
-		start = time.time()
-
-		for i, (data, order, cl) in enumerate(loader):
-			
-			data = data.float().cuda()
-			data1, data2 = torch.split(data, [3, 3], dim=1)
-
-			order = order.long().cuda()
-
-			opt_net.zero_grad()
-
-			_, im_feat = model(data2)
-			jig = jig_classifier(im_feat)
-
-			loss = jigen_loss(jig, order)
-			loss.backward()
-
-			opt_net.step()
-
-			jig_loss.update(loss.item(), data2.size(0))
-
-			if (i+1) % args.log_interval == 0:
-				print('[Train] Epoch: [{0}][{1}/{2}]\t'
-					  'Jig loss: {jig.val:.4f} ({jig.avg:.4f})\t'
-					  .format(epoch+1, i+1, len(loader), jig=jig_loss))
-
-		end = time.time()
-		elapsed = end-start
-		print(f"Time Taken:{elapsed//60:.0f}m{elapsed%60:.0f}s.\n")
-	
-	return model
 
 
 def main(args):
@@ -100,20 +52,14 @@ def main(args):
 
 	# Image transformations
 	image_transforms = {
-		'train':{
-		'image':
+		'train':
 		transforms.Compose([
-			transforms.RandomResizedCrop((222, 222), (0.8, 1.0)),
-			# transforms.RandomHorizontalFlip(0.5),
-			transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.4)
-		]),		
-		'tile':
-			transforms.Compose([
-			transforms.RandomGrayscale(0.1),
+			transforms.RandomResizedCrop((args.image_size, args.image_size), (0.8, 1.0)),
+			transforms.RandomHorizontalFlip(0.5),
+			transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.4),
 			transforms.ToTensor(),
 			transforms.Normalize(im_mean, im_std)
-		])
-		},
+		]),
 
 		'eval':
 		transforms.Compose([
@@ -131,10 +77,11 @@ def main(args):
 		save_folder_name += '_noaux'
 
 	path_cp = os.path.join(args.checkpoint_path, 'Sketchy', 'eccv_split')
-	path_log = os.path.join(args.result_jig2, 'cross', 'DomainNet', save_folder_name)
+	path_log = os.path.join(args.save_path, 'BT2_results', 'cross', 'DomainNet', save_folder_name)
 	if not os.path.isdir(path_log):
 		os.makedirs(path_log)
 
+	transform_bt, transform_bt_prime = barlowtwins.Transform_BT()
 	data_splits_ttt = []
 	for domain in [args.seen_domain, args.holdout_domain]:
 		splits_query = domainnet.trvalte_per_domain(args, domain, 0, tr_classes, va_classes, te_classes)
@@ -143,9 +90,9 @@ def main(args):
 	splits_gallery = domainnet.trvalte_per_domain(args, args.gallery_domain, 0, tr_classes, va_classes, te_classes)
 	data_splits_ttt += splits_gallery['te']
 
-	print('Number of training samples for Jig:{}.'.format(len(data_splits_ttt)))
+	print('Number of training samples for Bt2:{}.'.format(len(data_splits_ttt)))
 
-	data_ttt = JigsawDataset(data_splits_ttt, transforms=image_transforms['train'])
+	data_ttt = barlowtwins.BarlowDataset(data_splits_ttt, transform_bt, transform_bt_prime)
 	ttt_loader = DataLoader(data_ttt, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers, pin_memory=True)
 
 	best_model_name = 'val_map200-0.7603_prec200-0.7333_ep-1_mixlevel-img_wcce-1.0_wratio-0.5_wmse-1.0_clswts-2.0_e-100_es-15_opt-sgd_bs-64_lr-0.001_l2-0.0_beta-1_seed-0_tv-0.pth'
@@ -161,11 +108,11 @@ def main(args):
 		model.load_state_dict(checkpoint['model_state_dict'])
 		print("Loaded best model '{0}' (epoch {1}; mAP {2:.4f})\n".format(best_model_file, epoch, best_map))
 
-		path_cp_ttt = os.path.join(args.checkpoint_jig2, 'cross', args.dataset, save_folder_name)
+		path_cp_ttt = os.path.join(args.save_path, 'BT2_models', 'cross', 'DomainNet', save_folder_name)
 
-		model_ttt = jigsaw_ttt(ttt_loader, model, 31, args)
-		model_save_name = best_model_name[:-len('.pth')] + '_jig-lr-'+str(args.lr_net)+'_bs-'+str(args.batch_size)+\
-						  '_e-'+str(args.epochs)
+		model_ttt = barlowtwins.barlow_ttt(ttt_loader, model, args)
+		model_save_name = best_model_name[:-len('.pth')] + '_bt-lrc-'+str(args.lr_clf) + '_lrb-'+str(args.lr_net) +\
+						  '_bs-'+str(args.batch_size) + '_e-'+str(args.epochs)
 
 		utils.save_checkpoint({
 							'epoch':args.epochs+1, 
@@ -178,35 +125,34 @@ def main(args):
 
 	outstr = ''
 
-	for domain in [args.seen_domain, args.holdout_domain]:
-		for gzs in [0, 1]:
+	for gzs in [0, 1]:
 
-			test_head_str = 'Query:' + domain + '; Gallery:' + args.gallery_domain + '; Generalized:' + str(gzs)
-			print(test_head_str)
-			outstr += test_head_str
+		test_head_str = 'Query:' + domain + '; Gallery:' + args.gallery_domain + '; Generalized:' + str(gzs)
+		print(test_head_str)
+		outstr += test_head_str
 
-			splits_query = domainnet.trvalte_per_domain(args, domain, 0, tr_classes, va_classes, te_classes)
-			splits_gallery = domainnet.trvalte_per_domain(args, args.gallery_domain, gzs, tr_classes, va_classes, te_classes)
-			
-			data_te_query = BaselineDataset(np.array(splits_query['te']), transforms=image_transforms['eval'])
-			data_te_gallery = BaselineDataset(np.array(splits_gallery['te']), transforms=image_transforms['eval'])
-
-			# PyTorch test loader for query
-			te_loader_query = DataLoader(dataset=data_te_query, batch_size=64*5, shuffle=False, 
-										 num_workers=args.num_workers, pin_memory=True)
-			# PyTorch test loader for gallery
-			te_loader_gallery = DataLoader(dataset=data_te_gallery, batch_size=64*5, shuffle=False, 
-										   num_workers=args.num_workers, pin_memory=True)
-
-			print(f'#Test queries:{len(te_loader_query.dataset)}; #Test gallery samples:{len(te_loader_gallery.dataset)}.\n')
-			te_data = evaluate(te_loader_query, te_loader_gallery, model_ttt, None, epoch, args)
+		splits_query = domainnet.trvalte_per_domain(args, domain, 0, tr_classes, va_classes, te_classes)
+		splits_gallery = domainnet.trvalte_per_domain(args, args.gallery_domain, gzs, tr_classes, va_classes, te_classes)
 		
-			test_str="\n\nmAP@200 = %.4f, Prec@200 = %.4f, mAP@all = %.4f, Prec@100 = %.4f"%(np.mean(te_data['aps@200']), te_data['prec@200'], 
-					np.mean(te_data['aps@all']), te_data['prec@100'])
-			
-			print(test_str)
-			outstr += test_str
-			outstr += '\n\n'
+		data_te_query = BaselineDataset(np.array(splits_query['te']), transforms=image_transforms['eval'])
+		data_te_gallery = BaselineDataset(np.array(splits_gallery['te']), transforms=image_transforms['eval'])
+
+		# PyTorch test loader for query
+		te_loader_query = DataLoader(dataset=data_te_query, batch_size=64*5, shuffle=False, 
+										num_workers=args.num_workers, pin_memory=True)
+		# PyTorch test loader for gallery
+		te_loader_gallery = DataLoader(dataset=data_te_gallery, batch_size=64*5, shuffle=False, 
+										num_workers=args.num_workers, pin_memory=True)
+
+		print(f'#Test queries:{len(te_loader_query.dataset)}; #Test gallery samples:{len(te_loader_gallery.dataset)}.\n')
+		te_data = evaluate(te_loader_query, te_loader_gallery, model_ttt, None, epoch, args)
+	
+		test_str="\n\nmAP@200 = %.4f, Prec@200 = %.4f, mAP@all = %.4f, Prec@100 = %.4f"%(np.mean(te_data['aps@200']), te_data['prec@200'], 
+				np.mean(te_data['aps@all']), te_data['prec@100'])
+		
+		print(test_str)
+		outstr += test_str
+		outstr += '\n\n'
 	
 	print(outstr)
 	result_file = open(os.path.join(path_log, model_save_name+'.txt'), 'w')

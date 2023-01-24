@@ -1,5 +1,6 @@
-#### TTT-UCDR
+#### TTT-UCDR: Test-time Training for Universal Cross-Domain Retrieval
 
+[ArXiv preprint](https://arxiv.org/abs/2208.09198)
 An extension of [Universal Cross-Domain Retrieval: Generalizing across Classes and Domains](http://arxiv.org/abs/2108.08356) | [ICCV 2021](http://iccv2021.thecvf.com/).
 
 #### Requirements and Setup
@@ -21,3 +22,20 @@ Check `downloads` folder for scripts. Change path_dataset in `download_sketchy.s
 #### Pretrained Models
 
 Download from [here](https://drive.google.com/drive/folders/1v-ryaykcviyi7d4IdbtRZ0YuUg9L12_b?usp=sharing).
+
+#### Reproducing our results
+
+Check .sh files in `src/algos/SnMpNet` for Rotnet, Jigsaw, and Barlow Twins losses.
+
+#### 🎓 Cite
+
+If this code was helpful for your research, consider citing:
+
+```bibtex
+@article{paul2022ttt,
+  title={TTT-UCDR: Test-time Training for Universal Cross-Domain Retrieval},
+  author={Paul, Soumava and Dutta, Titir and Saha, Aheli and Samanta, Abhishek and Biswas, Soma},
+  journal={arXiv preprint arXiv:2208.09198},
+  year={2022}
+}
+```
