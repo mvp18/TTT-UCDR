@@ -109,11 +109,11 @@ def main(args):
 		print("Loaded best model '{0}' (epoch {1}; mAP {2:.4f})\n".format(best_model_file, epoch, best_map))
 
 		path_cp_ttt = os.path.join(args.save_path, 'rotnet'+str(args.rotnet_version)+'_models', 'cross', 'DomainNet', save_folder_name)
+		model_save_name = best_model_name[:-len('.pth')] + '_rot-lrc-'+str(args.lr_clf) + '_lrb-'+str(args.lr_net) +\
+						  '_bs-'+str(args.batch_size) + '_e-'+str(args.epochs) + '_mom-'+str(args.momentum) +\
+						  '_wd-'+str(args.l2_reg)
 
 		model_ttt = rotnet_ttt(ttt_loader, model, args, device)
-		model_save_name = best_model_name[:-len('.pth')] + '_rot-lrc-'+str(args.lr_clf) + '_lrb-'+str(args.lr_net) +\
-						  '_bs-'+str(args.batch_size) + '_e-'+str(args.epochs)
-
 		utils.save_checkpoint({
 							'epoch':args.epochs+1, 
 							'model_state_dict':model_ttt.state_dict(),

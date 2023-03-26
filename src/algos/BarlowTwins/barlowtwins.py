@@ -10,6 +10,195 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 
 from utils.logger import AverageMeter
+from utils import utils
+
+
+class Barlow_Online:
+
+	def __init__(self, te_query, te_gallery, model, checkpoint, img_transforms, args, device):
+
+		self.te_query = te_query
+		self.te_gallery = te_gallery
+		self.model = model
+		self.checkpoint = checkpoint
+
+		self.transform, self.transform_prime = Transform_BT()
+		self._eval_transform = img_transforms['eval']
+		self.args = args
+		self.device = device
+
+		# normalization layer for the representations z1 and z2
+		self.bn_layer = nn.BatchNorm1d(args.semantic_emb_size, affine=False).to(self.device)
+		self.backbone_params = list(self.model.base_model.parameters())[:-2]
+		self.classifier_params = self.model.base_model.last_linear.parameters()
+
+		self.opt_net = optim.SGD(self.backbone_params, momentum=0, weight_decay=0, lr=self.args.lr_net)
+		self.opt_clf = optim.SGD(list(self.classifier_params) + list(self.bn_layer.parameters()), momentum=self.args.momentum, 
+								 weight_decay=5e-4, nesterov=bool(self.args.nesterov), lr=self.args.lr_clf)
+
+		self.bt_loss = AverageMeter()
+
+	def adapt_single_sample(self, img):
+
+		if self.args.online=='std':
+			# print('000')
+			self.model.load_state_dict(self.checkpoint['model_state_dict'])
+
+		self.model.train()
+
+		img_domain = img.split('/')[-3]
+		if img_domain=='sketch' or img_domain=='quickdraw':
+			sample = ImageOps.invert(Image.open(img)).convert(mode='RGB')
+		else:
+			sample = Image.open(img).convert(mode='RGB')
+
+		for _ in range(self.args.num_iter):
+			x1 = [self.transform(sample) for _ in range(self.args.batch_size_train)]
+			x2 = [self.transform_prime(sample) for _ in range(self.args.batch_size_train)]
+
+			im1 = torch.stack(x1)
+			im2 = torch.stack(x2)
+
+			im1 = im1.float().to(self.device)
+			im2 = im2.float().to(self.device)
+
+			self.opt_net.zero_grad()
+			self.opt_clf.zero_grad()
+
+			_, im_feat1 = self.model(im1)
+			_, im_feat2 = self.model(im2)
+
+			z1 = self.model.base_model.last_linear(im_feat1)
+			z2 = self.model.base_model.last_linear(im_feat2)
+
+			# z1 = projector(z1)
+			# z2 = projector(z2)
+
+			# empirical cross-correlation matrix
+			# c = torch.t(z1) @ z2
+			c = torch.t(self.bn_layer(z1)) @ self.bn_layer(z2)
+			c.div_(self.args.batch_size_train)
+
+			on_diag = torch.diagonal(c).add_(-1).pow_(2).sum()
+			off_diag = off_diagonal(c).pow_(2).sum()
+			loss = on_diag + self.args.lambd * off_diag
+			loss.backward()
+
+			self.opt_net.step()
+			self.opt_clf.step()
+
+			self.bt_loss.update(loss.item(), im1.size(0))
+
+	def test_single_sample(self, img):
+
+		self.model.eval()
+
+		img_domain = img.split('/')[-3]
+		img_clss = img.split('/')[-2]
+
+		if img_domain=='sketch' or img_domain=='quickdraw':
+			sample = ImageOps.invert(Image.open(img)).convert(mode='RGB')
+		else:
+			sample = Image.open(img).convert(mode='RGB')
+
+		with torch.no_grad():
+			inputs = self._eval_transform(sample).unsqueeze(0).to(self.device)
+
+			_, im_feat = self.model(inputs)
+			im_em = self.model.base_model.last_linear(im_feat)
+
+		return im_em.cpu().data.numpy(), np.expand_dims(np.array(img_clss), axis=0)
+
+	def save_model(self, path_cp, model_save_name):
+
+		utils.save_checkpoint({
+							'iter':self.args.num_iter, 
+							'model_state_dict':self.model.state_dict(),
+							}, directory=path_cp, save_name=model_save_name, last_chkpt='')
+
+	def train(self):
+
+		# Start counting time
+		start = time.time()
+
+		np.random.shuffle(self.te_query['te'])
+
+		print('\nQuery set size: ', len(self.te_query['te']))
+		for i in range(len(self.te_query['te'])):
+
+			self.adapt_single_sample(self.te_query['te'][i])
+			sk_em, cls_sk = self.test_single_sample(self.te_query['te'][i])
+
+			# Accumulate sketch embedding
+			if i == 0:
+				self.acc_sk_em = sk_em
+				self.acc_cls_sk = cls_sk
+			else:
+				self.acc_sk_em = np.concatenate((self.acc_sk_em, sk_em), axis=0)
+				self.acc_cls_sk = np.concatenate((self.acc_cls_sk, cls_sk), axis=0)
+
+			if (i+1) % self.args.log_interval == 0:
+				print('[Train] [{0}/{1}]\t'
+					  'BT loss: {rn.val:.4f} ({rn.avg:.4f})\t'
+					  .format(i+1, len(self.te_query['te']), rn=self.bt_loss))
+
+			# if (i+1)==50:
+			# 	break
+
+		if self.args.include_gallery:
+			np.random.shuffle(self.te_gallery['te_unseen_cls'])
+
+		print('\nGallery set size: ', len(self.te_gallery['te_unseen_cls']))
+		for i in range(len(self.te_gallery['te_unseen_cls'])):
+
+			if self.args.include_gallery:
+				self.adapt_single_sample(self.te_gallery['te_unseen_cls'][i])
+			
+			im_em, cls_im = self.test_single_sample(self.te_gallery['te_unseen_cls'][i])
+
+			# Accumulate image embedding
+			if i == 0:
+				self.acc_im_em = im_em
+				self.acc_cls_im = cls_im
+			else:
+				self.acc_im_em = np.concatenate((self.acc_im_em, im_em), axis=0)
+				self.acc_cls_im = np.concatenate((self.acc_cls_im, cls_im), axis=0)
+
+			if (i+1) % self.args.log_interval == 0:
+				print('[Train] [{0}/{1}]\t'
+					  'BT loss: {rn.val:.4f} ({rn.avg:.4f})\t'
+					  .format(i+1, len(self.te_gallery['te_unseen_cls']), rn=self.bt_loss))
+
+			# if (i+1)==50:
+			# 	break
+		
+		if self.args.dataset=='DomainNet':
+			print('\nSeen gallery set size: ', len(self.te_gallery['te_seen_cls']))
+			for i in range(len(self.te_gallery['te_seen_cls'])):
+
+				im_seen_em, cls_seen_im = self.test_single_sample(self.te_gallery['te_seen_cls'][i])
+
+				# Accumulate image embedding
+				if i == 0:
+					acc_im_seen_em = im_seen_em
+					acc_cls_seen_im = cls_seen_im
+				else:
+					acc_im_seen_em = np.concatenate((acc_im_seen_em, im_seen_em), axis=0)
+					acc_cls_seen_im = np.concatenate((acc_cls_seen_im, cls_seen_im), axis=0)
+
+				# if (i+1)==50:
+				# 	break
+
+			self.acc_im_em_gzs = np.concatenate((self.acc_im_em, acc_im_seen_em), axis=0)
+			self.acc_cls_im_gzs = np.concatenate((self.acc_cls_im, acc_cls_seen_im), axis=0)
+
+			print('\nSeen + Unseen Gallery Emb Dim:{}'.format(self.acc_im_em_gzs.shape))
+
+		print('\nQuery Emb Dim:{}; Gallery Emb Dim:{}.'.format(self.acc_sk_em.shape, self.acc_im_em.shape))
+
+		end = time.time()
+		elapsed = end-start
+		print(f"Time Taken:{elapsed//60:.0f}m{elapsed%60:.0f}s.\n")
 
 
 def barlow_ttt(loader, model, args):

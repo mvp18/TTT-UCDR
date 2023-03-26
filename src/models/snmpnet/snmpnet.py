@@ -31,3 +31,42 @@ class SnMpNet(nn.Module):
 		mixup_ratio = self.ratio_predictor(feat_final)
 		
 		return mixup_ratio, feat_final
+
+
+class Projector(nn.Module):
+
+	def __init__(self, args, version=1, num_classes=4):
+
+		super(Projector, self).__init__()
+
+		if version==1:
+			sizes = [args.semantic_emb_size] + [num_classes]
+		elif version==2:
+			sizes = [2048] + [num_classes]
+		else:
+			raise ValueError('Version not supported')
+
+		layers = []
+		for i in range(len(sizes) - 2):
+			layers.append(nn.Linear(sizes[i], sizes[i + 1], bias=False))
+			layers.append(nn.BatchNorm1d(sizes[i + 1]))
+			layers.append(nn.ReLU(inplace=True))
+		
+		layers.append(nn.Linear(sizes[-2], sizes[-1], bias=False))
+		self.projector = nn.Sequential(*layers)
+
+		self.init_weights()
+
+	def init_weights(self):
+		for m in self.modules():
+			if isinstance(m, nn.Linear):
+				nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+			elif isinstance(m, nn.BatchNorm1d):
+				nn.init.constant_(m.weight, 1)
+				nn.init.constant_(m.bias, 0)
+	
+	def reset(self):
+		self.init_weights()
+
+	def forward(self, x):
+		return self.projector(x)

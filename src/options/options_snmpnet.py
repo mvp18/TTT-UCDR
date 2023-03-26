@@ -32,6 +32,7 @@ class Options:
         # Loss weight & reg. parameters
         parser.add_argument('-wcce', '--wcce', default=1.0, type=float, help='Weight on Distance based CCE Loss')
         parser.add_argument('-wmse', '--wmse', default=0.0, type=float, help='Weight on MSE Loss')
+        parser.add_argument('-wrot', '--wrot', default=0.0, type=float, help='Weight on Rotnet CCE Loss')
         parser.add_argument('-wrat', '--wratio', default=0.0, type=float, help='Weight on Soft Crossentropy Loss for mixup ratio prediction')
         parser.add_argument('-alpha', '--alpha', default=0, type=float, help='Parameter to scale weights for Class Similarity Matrix')
         parser.add_argument('-l2', '--l2_reg', default=0.0, type=float, help='L2 Weight Decay for optimizer')
@@ -51,6 +52,7 @@ class Options:
         # Optimization parameters
         parser.add_argument('-e', '--epochs', type=int, default=100, metavar='N', help='Number of epochs to train')
         parser.add_argument('-lr', '--lr', type=float, default=0.001, metavar='LR', help='Initial learning rate for optimizer & scheduler')
+        parser.add_argument('-nesterov', '--nesterov', type=int, choices=[0, 1], default=1, help='Use nesterov momentum or not for SGD')
         parser.add_argument('-mom', '--momentum', type=float, default=0.9, metavar='M', help='SGD momentum')
 
         # Checkpoint parameters
@@ -77,6 +79,7 @@ class Options:
 
         # Rotnet parameters
         parser.add_argument('-rot_v', '--rotnet_version', type=int, choices=[1, 2], default=2, help='Rotnet loss version')
+        parser.add_argument('-rotim', '--rotim_all_loss', type=int, choices=[0, 1], default=1, help='Whether to use rotated image for all losses during training.')
 
         self.parser = parser
 
